@@ -1,5 +1,11 @@
-import { RANKS, norm, deriveKey, encryptDataset, decryptDataset, parseWorkbook, buildIndex, searchIndices, refOf, compareRef, classifySub, classifyCase } from './core.js';
+import { RANKS, norm, deriveKey, encryptDataset, decryptDataset, packDataset, unpackDataset, parseWorkbook, buildIndex, searchIndices, refOf, compareRef, classifySub, classifyCase } from './core.js';
 import { LEXIQUE } from './lexique.js';
+import { CONFIG } from './config.js';
+
+const AUTH = !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey); // mode comptes utilisateurs (Supabase)
+let sb = null; // client Supabase
+let recovery = false; // arrivée par le lien « mot de passe oublié »
+let isAdmin = false;
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -31,16 +37,20 @@ const idb = (mode, fn) =>
 const keyGet = () => idb('readonly', (s) => s.get('key')).catch(() => null);
 const keySet = (k) => idb('readwrite', (s) => s.put(k, 'key')).catch(() => {});
 const keyDel = () => idb('readwrite', (s) => s.delete('key')).catch(() => {});
+const cacheGet = () => idb('readonly', (s) => s.get('data')).catch(() => null); // dernier fichier reçu (mode comptes)
+const cacheSet = (b) => idb('readwrite', (s) => s.put(b, 'data')).catch(() => {});
+const cacheDel = () => idb('readwrite', (s) => s.delete('data')).catch(() => {});
 
 // ---------- État ----------
 const emptyF = () => ({ year: 'last', ranks: new Set(), ifMin: '', ifMax: '', sub: new Set(), link: false, st: new Set(), ed: new Set(), dom: new Set(), th: new Set(), cr: new Set(), vf: '', x: {} });
 const S = { data: null, index: null, key: null, buf: null, q: '', scope: 'all', exact: ls.get('exact', false), all: ls.get('all', true), sort: ls.get('sort', 'rank'), f: emptyF(), rows: [], shown: 0 };
 
 // ---------- Démarrage ----------
-const show = (id) => ['app', 'gate', 'empty'].forEach((x) => ($('#' + x).hidden = x !== id));
+const show = (id) => ['app', 'gate', 'empty', 'auth'].forEach((x) => ($('#' + x).hidden = x !== id));
 
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (AUTH) return bootAuth();
   let buf = null;
   try {
     const r = await fetch('data.enc', { cache: 'no-cache' });
@@ -94,6 +104,11 @@ $('#gate-form').addEventListener('submit', async (e) => {
 });
 
 $('#btn-lock').addEventListener('click', async () => {
+  if (AUTH) {
+    $('#acc-email').textContent = (S.user && S.user.email) || '';
+    $('#acc-msg').textContent = '';
+    return $('#account').showModal();
+  }
   await keyDel();
   location.reload();
 });
@@ -360,6 +375,12 @@ $('#sort').addEventListener('change', (e) => { S.sort = e.target.value; ls.set('
 // ---------- Mise à jour des données ----------
 const U = { file: null, out: null };
 const openUpdate = () => {
+  if (AUTH) {
+    $('#u-pass').hidden = $('#u-pass2').hidden = true;
+    $('#u-go').textContent = 'Générer et publier';
+    $('#update').showModal();
+    return;
+  }
   $('#u-pass2').hidden = !!S.key;
   $('#u-pass').placeholder = S.key ? 'Laisser vide pour garder le code actuel' : "Choisissez un code d'accès";
   $('#u-pass2').placeholder = "Confirmer le code d'accès";
@@ -368,7 +389,7 @@ const openUpdate = () => {
 $('#btn-update').addEventListener('click', openUpdate);
 $('#empty-update').addEventListener('click', openUpdate);
 
-const canGo = () => ($('#u-go').disabled = !U.file || (!S.key && !$('#u-pass').value));
+const canGo = () => ($('#u-go').disabled = !U.file || (!AUTH && !S.key && !$('#u-pass').value));
 $('#u-file').addEventListener('change', (e) => { U.file = e.target.files[0] || null; $('#u-fname').textContent = U.file ? U.file.name : 'aucun fichier'; canGo(); });
 $('#u-pass').addEventListener('input', canGo);
 
@@ -390,7 +411,7 @@ $('#u-go').addEventListener('click', async () => {
   out.innerHTML = '<p class="hint">Lecture du classeur…</p>';
   try {
     let key = S.key;
-    const p = $('#u-pass').value;
+    const p = AUTH ? '' : $('#u-pass').value;
     if (p) {
       if (!S.key && p !== $('#u-pass2').value) return fail('Les deux codes ne sont pas identiques.');
       if (p.length < 12) return fail("Code trop court : 12 caractères minimum (le fichier chiffré est public, un code faible peut être deviné). Une phrase de plusieurs mots convient très bien.");
@@ -399,7 +420,7 @@ $('#u-go').addEventListener('click', async () => {
     }
     const XLSX = await loadXLSX();
     const data = parseWorkbook(XLSX, await U.file.arrayBuffer(), U.file.name);
-    const bytes = await encryptDataset(data, key);
+    const bytes = AUTH ? await packDataset(data) : await encryptDataset(data, key);
     // comparaison avec les données actuellement chargées
     let diff = '';
     if (S.data) {
@@ -411,6 +432,19 @@ $('#u-go').addEventListener('click', async () => {
       diff = `<li>${added} revue(s) ajoutée(s), ${removed} retirée(s) par rapport aux données actuelles${newYears.length ? `, nouvelle(s) année(s) : ${newYears.join(', ')}` : ''}</li>`;
     }
     U.out = { bytes, data, key };
+    if (AUTH) {
+      out.innerHTML = '<p class="hint">Publication…</p>';
+      const { error } = await sb.storage.from('data').upload('data.bin', new Blob([bytes], { type: 'application/octet-stream' }), { upsert: true, contentType: 'application/octet-stream' });
+      if (error) return fail('Publication refusée : ' + error.message + ' (compte administrateur ? script SQL exécuté ?)');
+      await cacheSet(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      out.innerHTML = `<div class="ok"><b>Publié.</b> Tous les utilisateurs verront ces données à leur prochaine ouverture de l'appli.<ul>
+        <li>${data.journals.length.toLocaleString('fr-FR')} revues · années ${data.years.join(', ')}</li>${diff}
+        ${data.extras.length ? `<li>Colonnes supplémentaires détectées : ${esc(data.extras.join(', '))}</li>` : ''}</ul></div>
+        ${data.warnings.length ? `<div class="warnbox"><b>À vérifier dans le classeur</b><ul>${data.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
+        <button class="btn primary" id="u-preview" type="button">Afficher ces données</button>`;
+      $('#u-preview').onclick = () => { load(data); $('#update').close(); };
+      return;
+    }
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
     out.innerHTML = `<div class="ok"><b>data.enc prêt</b> (${(bytes.length / 1024).toFixed(0)} Ko)<ul>
         <li>${data.journals.length.toLocaleString('fr-FR')} revues · années ${data.years.join(', ')}</li>${diff}
@@ -432,5 +466,112 @@ $('#u-go').addEventListener('click', async () => {
     canGo();
   }
 });
+
+// ---------- Comptes utilisateurs (Supabase) ----------
+const loadScript = (src) => new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error('Chargement impossible : ' + src)); document.head.append(el); });
+const MIN_PWD = 12;
+
+function setView(v, title, help) {
+  document.querySelectorAll('#auth form').forEach((f) => (f.hidden = f.dataset.view !== v));
+  $('#auth-title').textContent = title || { login: 'Connexion', forgot: 'Mot de passe oublié', newpwd: 'Nouveau mot de passe' }[v];
+  $('#auth-help').textContent = help || '';
+  authMsg('');
+  $('#meta').textContent = 'Accès protégé';
+  show('auth');
+  const first = document.querySelector(`#auth form[data-view="${v}"] input`);
+  if (first) first.focus();
+}
+function authMsg(text, ok) {
+  const m = $('#auth-msg');
+  m.hidden = !text;
+  m.textContent = text || '';
+  m.className = ok ? 'ok-msg' : 'error';
+}
+
+async function bootAuth() {
+  $('#btn-update').hidden = true;
+  try { await loadScript('vendor/supabase.js'); } catch (e) { setView('login'); return authMsg(e.message); }
+  recovery = /(^|[#&])type=recovery(&|$)/.test(location.hash); // lien « mot de passe oublié » reçu par e-mail
+  sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, { auth: { flowType: 'implicit', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  sb.auth.onAuthStateChange((ev, session) => {
+    if (ev === 'PASSWORD_RECOVERY') { recovery = true; setTimeout(() => route(session), 0); }
+    else if (ev === 'SIGNED_OUT') setTimeout(() => route(null), 0);
+  });
+  const { data } = await sb.auth.getSession();
+  if (!recovery) route(data.session);
+}
+
+async function route(session) {
+  if (!session) return setView('login');
+  S.user = session.user;
+  if (recovery) return setView('newpwd', 'Nouveau mot de passe', 'Choisissez votre nouveau mot de passe.');
+  if (session.user.app_metadata?.pwd_changed !== true) return setView('newpwd', 'Première connexion', 'Choisissez un mot de passe personnel : l\'accès aux données est bloqué tant que le mot de passe initial n\'a pas été changé.');
+  isAdmin = session.user.app_metadata?.role === 'admin';
+  $('#btn-update').hidden = !isAdmin;
+  $('#btn-lock').hidden = false;
+  $('#empty-update').hidden = !isAdmin;
+  await loadRemote();
+}
+
+async function loadRemote() {
+  $('#meta').textContent = 'Chargement…';
+  let buf = null, offline = false;
+  try {
+    const { data, error } = await sb.storage.from('data').download('data.bin');
+    if (data) { buf = await data.arrayBuffer(); cacheSet(buf); } else if (error && /fetch|network/i.test(error.message || '')) offline = true;
+  } catch { offline = true; }
+  if (!buf) { buf = await cacheGet(); offline = !!buf; }
+  if (!buf) return showEmpty(isAdmin ? "Aucune donnée publiée : importez votre classeur Excel pour la première fois." : "Aucune donnée disponible : le fichier n'est pas encore publié, ou ce compte n'a pas les droits. Contactez l'administrateur.");
+  try { load(await unpackDataset(buf)); } catch (e) { return showEmpty('Fichier de données illisible : ' + e.message); }
+  if (offline) $('#meta').textContent += ' · hors ligne';
+}
+
+async function changePassword(p, p2) {
+  if (p !== p2) return 'Les deux mots de passe ne sont pas identiques.';
+  if (p.length < MIN_PWD) return `Mot de passe trop court : ${MIN_PWD} caractères minimum (une phrase de plusieurs mots convient très bien).`;
+  const { error } = await sb.auth.updateUser({ password: p });
+  if (error) return /same/i.test(error.message) ? "Le nouveau mot de passe doit être différent de l'actuel." : error.message;
+  const { data, error: e2 } = await sb.auth.refreshSession();
+  if (e2) return e2.message;
+  recovery = false;
+  history.replaceState(null, '', location.pathname + location.search);
+  if (data.session?.user.app_metadata?.pwd_changed !== true) return "Le serveur n'a pas enregistré le changement (script supabase/setup.sql non exécuté ?).";
+  return { session: data.session };
+}
+
+if (AUTH) {
+  $('#auth-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    authMsg('');
+    const { data, error } = await sb.auth.signInWithPassword({ email: $('#a-email').value.trim(), password: $('#a-pass').value });
+    if (error) return authMsg(error.status === 429 ? 'Trop de tentatives : réessayez dans quelques minutes.' : 'E-mail ou mot de passe incorrect.');
+    $('#a-pass').value = '';
+    route(data.session);
+  });
+  $('#a-forgot').addEventListener('click', () => { setView('forgot'); $('#a-femail').value = $('#a-email').value; });
+  $('#a-back').addEventListener('click', () => setView('login'));
+  $('#auth-forgot').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const { error } = await sb.auth.resetPasswordForEmail($('#a-femail').value.trim(), { redirectTo: location.origin + location.pathname });
+    if (error && error.status === 429) return authMsg("Trop de demandes : réessayez dans quelques minutes.");
+    authMsg("Si un compte existe pour cette adresse, un e-mail avec un lien de réinitialisation vient d'être envoyé (pensez à vérifier les courriers indésirables).", true);
+  });
+  $('#auth-newpwd').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const r = await changePassword($('#a-new').value, $('#a-new2').value);
+    if (typeof r === 'string') return authMsg(r);
+    $('#a-new').value = $('#a-new2').value = '';
+    route(r.session);
+  });
+  const logout = async () => { await cacheDel(); await sb.auth.signOut(); location.reload(); };
+  $('#a-logout1').addEventListener('click', logout);
+  $('#acc-logout').addEventListener('click', logout);
+  $('#acc-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const r = await changePassword($('#acc-new').value, $('#acc-new2').value);
+    $('#acc-msg').textContent = typeof r === 'string' ? r : 'Mot de passe modifié.';
+    if (typeof r !== 'string') $('#acc-new').value = $('#acc-new2').value = '';
+  });
+}
 
 boot();

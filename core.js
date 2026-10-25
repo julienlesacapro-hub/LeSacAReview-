@@ -70,6 +70,24 @@ export async function decryptDataset(buf, key) {
   return JSON.parse(new TextDecoder().decode(plain));
 }
 
+// Mode comptes utilisateurs : même contenu, gzip sans chiffrement (l'accès est contrôlé par le serveur).
+const MAGIC0 = [0x4c, 0x53, 0x52, 0x30]; // "LSR0"
+export async function packDataset(obj) {
+  const raw = new TextEncoder().encode(JSON.stringify(obj));
+  const body = typeof CompressionStream !== 'undefined' ? await pipe(raw, new CompressionStream('gzip')) : raw;
+  const out = new Uint8Array(5 + body.length);
+  out.set(MAGIC0, 0);
+  out[4] = typeof CompressionStream !== 'undefined' ? 1 : 0;
+  out.set(body, 5);
+  return out;
+}
+export async function unpackDataset(buf) {
+  const b = new Uint8Array(buf);
+  if (b.length < 8 || MAGIC0.some((m, i) => b[i] !== m)) throw new Error('format');
+  const body = b[4] === 1 ? await pipe(b.slice(5), new DecompressionStream('gzip')) : b.slice(5);
+  return JSON.parse(new TextDecoder().decode(body));
+}
+
 // ---------- Lecture du classeur ----------
 const COLS = [
   ['nlm', ['nlmid']],
