@@ -25,7 +25,7 @@
     </div>
   </div>
   <div class="top-actions">
-    <button class="icon-btn" id="btn-lock" title="Verrouiller et oublier le code sur cet appareil" aria-label="Verrouiller" hidden>
+    <button class="icon-btn" id="btn-lock" title="Verrouiller / mon compte" aria-label="Verrouiller / mon compte" hidden>
       <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     </button>
     <button class="icon-btn" id="btn-update" title="Mettre à jour les données" aria-label="Mettre à jour les données">
@@ -110,6 +110,45 @@
     <button class="btn primary wide" type="button" id="empty-update">Préparer les données depuis Excel</button>
   </div>
 </section>
+
+<section id="auth" class="gate" hidden>
+  <div class="panel auth">
+    <svg class="gate-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+    <h2 id="auth-title">Connexion</h2>
+    <p id="auth-help"></p>
+    <form id="auth-login" data-view="login" class="aform">
+      <input id="a-email" type="email" placeholder="Adresse e-mail" autocomplete="username" required>
+      <input id="a-pass" type="password" placeholder="Mot de passe" autocomplete="current-password" required>
+      <button class="btn primary wide" type="submit">Se connecter</button>
+      <button class="linkbtn" type="button" id="a-forgot">Mot de passe oublié ?</button>
+    </form>
+    <form id="auth-forgot" data-view="forgot" class="aform" hidden>
+      <input id="a-femail" type="email" placeholder="Adresse e-mail du compte" autocomplete="username" required>
+      <button class="btn primary wide" type="submit">Envoyer le lien de réinitialisation</button>
+      <button class="linkbtn" type="button" id="a-back">Retour à la connexion</button>
+    </form>
+    <form id="auth-newpwd" data-view="newpwd" class="aform" hidden>
+      <input id="a-new" type="password" placeholder="Nouveau mot de passe" autocomplete="new-password" minlength="12" required>
+      <input id="a-new2" type="password" placeholder="Confirmer le nouveau mot de passe" autocomplete="new-password" minlength="12" required>
+      <button class="btn primary wide" type="submit">Enregistrer le mot de passe</button>
+      <button class="linkbtn" type="button" id="a-logout1">Se déconnecter</button>
+    </form>
+    <p id="auth-msg" class="error" role="alert" hidden></p>
+  </div>
+</section>
+
+<dialog id="account" class="sheet">
+  <form method="dialog" class="sheet-close"><button class="icon-btn" aria-label="Fermer">×</button></form>
+  <h2>Mon compte</h2>
+  <p class="hint" id="acc-email"></p>
+  <form id="acc-form" class="aform">
+    <input id="acc-new" type="password" placeholder="Nouveau mot de passe" autocomplete="new-password" minlength="12" required>
+    <input id="acc-new2" type="password" placeholder="Confirmer le nouveau mot de passe" autocomplete="new-password" minlength="12" required>
+    <button class="btn primary" type="submit">Changer le mot de passe</button>
+    <p id="acc-msg" class="hint" aria-live="polite"></p>
+  </form>
+  <p style="margin-bottom:22px"><button class="btn ghost" id="acc-logout" type="button">Se déconnecter</button></p>
+</dialog>
 
 <dialog id="detail" class="sheet" aria-labelledby="d-title"></dialog>
 

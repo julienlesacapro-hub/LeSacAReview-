@@ -254,3 +254,10 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 .tbtn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 .card .main { min-width: 0; grid-column: 2; }
 @media (min-width: 720px) { .card .main { grid-column: 2; } }
+
+.aform { display: grid; gap: 10px; width: 100%; }
+.aform input[type="email"], .aform input[type="password"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--bg); }
+.sheet .aform { margin-bottom: 14px; }
+.linkbtn { background: none; border: 0; color: var(--accent); cursor: pointer; font-weight: 600; padding: 6px; }
+.panel.auth .error, .panel.auth .ok-msg { margin: 0; }
+.ok-msg { color: var(--free-fg); font-weight: 600; }
