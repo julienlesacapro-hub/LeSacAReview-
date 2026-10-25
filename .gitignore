@@ -1,0 +1,9 @@
+# Le classeur Excel contient des Impact Factors Clarivate : ne jamais le publier.
+# Seul data.enc (chiffré) doit être dans le dépôt.
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+~$*
+.DS_Store
+node_modules/

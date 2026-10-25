@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revues SIGAPS</title>
+<meta name="description" content="Recherche de revues scientifiques : rang SIGAPS, impact factor, soumission gratuite ou payante, lien vers la revue.">
+<meta name="theme-color" content="#0f3d4c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Revues">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <img class="logo" src="icons/icon.svg" alt="" width="36" height="36">
+    <div>
+      <h1>Revues SIGAPS</h1>
+      <p id="meta" class="meta">Chargement…</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button class="icon-btn" id="btn-lock" title="Verrouiller et oublier le code sur cet appareil" aria-label="Verrouiller" hidden>
+      <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-update" title="Mettre à jour les données" aria-label="Mettre à jour les données">
+      <svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L8 8m4-4 4 4"/><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="app" hidden>
+  <section class="search-zone">
+    <form id="search-form" role="search" autocomplete="off">
+      <div class="searchbox">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" inputmode="search" enterkeyhint="search" placeholder="Domaine ou titre : trachée, cardiology, Lancet…" aria-label="Rechercher un domaine ou un titre de revue" autocapitalize="off" spellcheck="false">
+        <button type="button" id="q-clear" class="clear" aria-label="Effacer" hidden>×</button>
+      </div>
+      <div class="search-opts">
+        <div class="seg" role="radiogroup" aria-label="Chercher dans">
+          <label><input type="radio" name="scope" value="all" checked><span>Tout</span></label>
+          <label><input type="radio" name="scope" value="dom"><span>Domaine</span></label>
+          <label><input type="radio" name="scope" value="titre"><span>Titre</span></label>
+        </div>
+        <label class="check" title="Désactive synonymes FR/EN, formes proches et fautes de frappe : seuls les mots entiers saisis sont cherchés.">
+          <input type="checkbox" id="exact"><span>Termes exacts</span>
+        </label>
+        <label class="check" title="Décochée : au moins un des mots saisis suffit.">
+          <input type="checkbox" id="allwords" checked><span>Tous les mots</span>
+        </label>
+        <button type="button" class="btn ghost filters-toggle" id="btn-filters">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filtres <b id="filters-count" hidden></b>
+        </button>
+      </div>
+    </form>
+    <div id="chips" class="active-chips"></div>
+  </section>
+
+  <div class="layout">
+    <aside id="filters" class="filters" aria-label="Filtres">
+      <div class="filters-head">
+        <h2>Filtres</h2>
+        <button type="button" class="btn ghost small" id="f-reset">Réinitialiser</button>
+        <button type="button" class="icon-btn only-mobile" id="f-close" aria-label="Fermer">×</button>
+      </div>
+      <div class="filters-body" id="filters-body"></div>
+      <div class="filters-foot only-mobile"><button type="button" class="btn primary wide" id="f-apply">Voir les résultats</button></div>
+    </aside>
+
+    <section class="results" aria-live="polite">
+      <div class="results-head">
+        <p id="count" class="count"></p>
+        <label class="sort">Tri
+          <select id="sort">
+            <option value="rank">Rang puis IF</option>
+            <option value="if">IF décroissant</option>
+            <option value="title">Titre A → Z</option>
+          </select>
+        </label>
+      </div>
+      <ol id="list" class="list"></ol>
+      <div id="more" class="more"></div>
+    </section>
+  </div>
+</main>
+
+<section id="gate" class="gate" hidden>
+  <form id="gate-form" class="panel" autocomplete="off">
+    <svg class="gate-icon" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    <h2>Données protégées</h2>
+    <p>Les Impact Factors sont la propriété de Clarivate : le fichier publié sur GitHub est <b>chiffré</b>. Saisissez le code d'accès une fois ; il sera mémorisé sur cet appareil.</p>
+    <input id="gate-pass" type="password" placeholder="Code d'accès" autocomplete="current-password" required>
+    <label class="check"><input type="checkbox" id="gate-remember" checked><span>Mémoriser sur cet appareil</span></label>
+    <p id="gate-error" class="error" role="alert" hidden></p>
+    <button class="btn primary wide" type="submit">Déverrouiller</button>
+  </form>
+</section>
+
+<section id="empty" class="gate" hidden>
+  <div class="panel">
+    <svg class="gate-icon" viewBox="0 0 24 24"><path d="M12 15V4m0 0L8 8m4-4 4 4"/><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+    <h2>Aucune donnée publiée</h2>
+    <p id="empty-msg">Le fichier <code>data.enc</code> est absent du dépôt. Générez-le depuis votre classeur Excel (une seule fois), puis déposez-le sur GitHub.</p>
+    <button class="btn primary wide" type="button" id="empty-update">Préparer les données depuis Excel</button>
+  </div>
+</section>
+
+<dialog id="detail" class="sheet" aria-labelledby="d-title"></dialog>
+
+<dialog id="update" class="sheet">
+  <form method="dialog" class="sheet-close"><button class="icon-btn" aria-label="Fermer">×</button></form>
+  <h2>Mettre à jour les données</h2>
+  <p class="hint">Le classeur Excel est lu <b>dans votre navigateur</b> (rien n'est envoyé), puis converti en fichier chiffré <code>data.enc</code> à déposer sur GitHub. Les années ajoutées (colonnes <i>2026 IF / Cat.</i>…), les nouvelles revues et les colonnes supplémentaires sont détectées automatiquement.</p>
+  <ol class="steps">
+    <li>
+      <label class="file"><input id="u-file" type="file" accept=".xlsx,.xlsm,.xls"><span class="btn ghost">Choisir le classeur Excel…</span> <em id="u-fname">aucun fichier</em></label>
+    </li>
+    <li>
+      <input id="u-pass" type="password" placeholder="Code d'accès (le même que d'habitude)" autocomplete="new-password">
+      <input id="u-pass2" type="password" placeholder="Confirmer le code d'accès" autocomplete="new-password" hidden>
+    </li>
+    <li><button class="btn primary" id="u-go" type="button" disabled>Générer data.enc</button></li>
+  </ol>
+  <div id="u-out" class="u-out" aria-live="polite"></div>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
