@@ -211,11 +211,17 @@ function rankBlock(ref, years, cls = '') {
     <div class="if">IF ${fmtIF(ref.if)}${ref.year ? `<small class="yr ${old ? 'old' : ''}" ${old ? `title="Pas de donnée ${last} : dernière année disponible"` : ''}>${ref.year}</small>` : '<small>aucune donnée</small>'}</div></div>`;
 }
 
+const fullTitle = (j) => {
+  const t = j.x && j.x['Titre complet (NLM)'];
+  return t && norm(t).replace(/[^a-z0-9]/g, '') !== norm(j.t).replace(/[^a-z0-9]/g, '') ? t : '';
+};
+
 function card({ j, ref }, n) {
   const doms = [...j.dm, ...j.th].slice(0, 4).join(' · ');
   return `<li class="card ${rkClass(ref.cat)}" data-n="${n}">
     ${rankBlock(ref, S.data.years)}
     <div class="main"><h3><button class="tbtn" type="button">${esc(j.t)}</button></h3>
+      ${fullTitle(j) ? `<p class="full">${esc(fullTitle(j))}</p>` : ''}
       ${doms ? `<p class="sub">${esc(doms)}</p>` : ''}
       <div class="badges">${subBadge(j)}${j.st ? `<span class="tag" title="${j.st === 'CI' ? 'Indexée MEDLINE' : j.st === 'NCI' ? 'Non indexée MEDLINE actuellement' : ''}">${esc(j.st)}</span>` : ''}${j.ed ? `<span class="tag">${esc(j.ed)}</span>` : ''}</div></div>
     <div class="go">${goButton(j)}</div>

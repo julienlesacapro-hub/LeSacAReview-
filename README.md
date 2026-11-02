@@ -84,6 +84,7 @@ Changer de code d'accès : générer `data.enc` avec le nouveau code ; chaque ap
    python3 tools/fusion_sigaps.py --xlsx Revues_ancien.xlsx --export export1.txt export2.txt --out Revues_nouveau.xlsx --num 5 --date jj/mm/aaaa
    ```
    Le script met à jour les valeurs SIGAPS des revues déjà présentes (sans toucher à vos colonnes lien / soumission / APC / remarques…), rattache les revues « Hors export » retrouvées par leur titre, **ajoute les nouvelles revues à la fin**, ajoute **une nouvelle année** (colonnes IF / Cat.) si l'export en contient une, recalcule la colonne Domaine(s), étend les formules et met à jour les onglets *Codes_disciplines*, *Synthèse*, *Sources* et *Lisez-moi*. Il affiche un bilan et signale tout export incomplet.
+   Option `--nlm export_indexed.txt export_not_indexed.txt` : enrichit avec le **catalogue NLM** (export texte « résumé étendu » de NLM Catalog) : lien vers la revue (jamais écrasé s'il existe déjà), titre complet, langue, pays, MeSH (nouvelles colonnes à droite des années). Rattachement par NLMid. Une suite d'export SIGAPS sans en-tête est acceptée ; ajouter `--announced N` (total annoncé par SIGAPS) pour contrôler l'exhaustivité.
 3. Si le script réclame le libellé français d'un nouveau code de discipline, l'ajouter dans `tools/disciplines_fr.py` (les libellés au-delà des 48 d'origine sont des traductions rédigées à la main).
 4. Ouvrir `Revues_nouveau.xlsx` dans Excel, contrôler (remarques « à vérifier », colonnes vides), puis le publier dans l'appli : ⬆ → choisir le fichier → **Générer et publier**.
 

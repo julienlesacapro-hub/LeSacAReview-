@@ -45,31 +45,104 @@ THEMES = [
 
 # ---------------------------------------------------------------- lecture des exports
 def parse_export(path):
+    """Lit un export SIGAPS. Accepte aussi une suite d'export SANS en-tête (lignes de revues seules, puis tableau final
+    « Liste des disciplines… ») : les années sont alors déduites des autres fichiers ou du classeur."""
     lines = Path(path).read_text(encoding='utf8').splitlines()
-    codes, start, years, announced = {}, None, [], None
-    for i, l in enumerate(lines):
+    codes, years, announced, data = {}, None, None, []
+    in_footer = False
+    for l in lines:
         m = re.match(r'^(?:Discipline.*:\t)?- ([A-Z0-9]{2}) : (.+)$', l)
-        if m and start is None:
+        if m:
             codes[m.group(1)] = m.group(2).strip()
+            continue
         if l.startswith('Nombre de r'):
             announced = int(re.sub(r'\D', '', l))
-        if l.startswith('connu\t'):
+        elif l.startswith('connu\t'):
             years = [int(x) for x in l.split('\t')[1:] if re.fullmatch(r'\d{4}', x.strip())]
-        if l.startswith('IF\tCat.'):
-            start = i + 1
-            break
-    if start is None or not years:
-        raise SystemExit(f"{path} : en-tête SIGAPS non reconnu (lignes « connu\\t2021… » et « IF\\tCat. » attendues).")
-    rows, broken = [], 0
-    for l in lines[start:]:
-        if not l.strip():
+        elif l.startswith('Liste des disciplines'):
+            in_footer = True
+        elif in_footer:
+            p = l.split('\t')
+            if len(p) == 3 and re.fullmatch(r'[A-Z0-9]{2}', p[0].strip()) and p[2].strip().isdigit():
+                codes[p[0].strip()] = p[1].strip()
+        elif l.strip() and '\t' in l and not l.startswith(('IF\tCat.', 'NLMid')) and re.match(r'^[0-9A-Za-z]+\t', l):
+            data.append([x.strip() for x in l.split('\t')])
+    return dict(path=str(path), codes=codes, years=years, data=data, announced=announced)
+
+
+def finalize_export(e, years):
+    """Sépare lignes complètes / incomplètes une fois les années connues."""
+    width = 8 + 2 * len(years)
+    e['rows'] = [p for p in e['data'] if len(p) == width]
+    e['broken'] = len(e['data']) - len(e['rows'])
+    e['years'] = years
+
+
+NLM_KEYS = {'Author(s)', 'Title Abbreviation', 'Title(s)', 'Publication Start Year', 'Publication End Year', 'Frequency', 'Country of Publication',
+            'Publisher', 'Description', 'Language', 'ISSN', 'LCCN', 'Electronic Links', 'Fully Indexed In', 'In', 'Current Indexing Status',
+            'Current Subset', 'MeSH', 'Publication Type(s)', 'Notes', 'Other ID', 'NLM ID', 'Coden', 'Latest Publisher', 'Selectively Indexed in',
+            'Other Subject(s)', 'Edition', 'Indexes', 'Complemented by (work)', 'Mode of access', 'Terms of Use', 'SuDocs Number'}
+NLM_COLS = [('Titre complet (NLM)', 'title'), ('Langue', 'lang'), ('Pays de publication', 'country'), ('MeSH (NLM)', 'mesh')]
+LINK_BAD = re.compile(r'pmc\.ncbi|ncbi\.nlm|clockss|portico|europepmc|bibpurl|doi\.org|archive\.org|handle\.net|purl\.|lockss|nih\.gov|ovidsp|ebscohost', re.I)
+
+
+def parse_nlm(path):
+    """Notices du catalogue NLM (export texte « résumé étendu »)."""
+    recs, cur, last = [], None, None
+    for l in Path(path).read_text(encoding='utf8').splitlines():
+        m = re.match(r'^(\d+)\. (.*)$', l)
+        if m and re.match(r'^\d+\. (Author\(s\)|Title Abbreviation|Title\(s\)|Editor)', l):
+            if cur:
+                recs.append(cur)
+            cur, l = {}, m.group(2)
+        if cur is None:
             continue
-        p = [x.strip() for x in l.split('\t')]
-        if len(p) != 8 + 2 * len(years):
-            broken += 1
-            continue
-        rows.append(p)
-    return dict(path=str(path), codes=codes, years=years, rows=rows, broken=broken, announced=announced)
+        m2 = re.match(r"^([A-Z][A-Za-z()' ]{1,40}): ?(.*)$", l)
+        if m2 and m2.group(1) in NLM_KEYS:
+            last = m2.group(1)
+            cur[last] = (cur[last] + ' ' + m2.group(2)).strip() if last in cur else m2.group(2).strip()
+        elif last and l.strip():
+            cur[last] += ' ' + l.strip()
+    if cur:
+        recs.append(cur)
+    return recs
+
+
+def nlm_id(r):
+    return re.sub(r'\[.*$', '', r.get('NLM ID', '')).strip().rstrip('R')
+
+
+def best_link(links):
+    ls = [u.strip() for u in re.split(r',\s*(?=https?://)', links or '') if u.strip()]
+    ok = [u for u in ls if not LINK_BAD.search(u)]
+    return (ok or ls or [''])[0]
+
+
+def nlm_values(r):
+    langs = []
+    for x in re.split(r'\s*,\s*', r.get('Language', '')):
+        if x and x not in langs:
+            langs.append(x)
+    return {
+        'title': re.sub(r'\s+', ' ', r.get('Title(s)', '')).strip().rstrip('.').strip(),
+        'lang': ', '.join(langs),
+        'country': r.get('Country of Publication', '').strip(),
+        'mesh': r.get('MeSH', '').strip(),
+    }
+
+
+def shift_block(ws, start_col, by, max_row):
+    """Décale vers la droite les colonnes >= start_col (valeurs, styles, fusions, largeurs)."""
+    merges = [m for m in list(ws.merged_cells.ranges) if m.min_col >= start_col]
+    for m in merges:
+        ws.unmerge_cells(str(m))
+    maxc = ws.max_column
+    widths = {c: ws.column_dimensions[L(c)].width for c in range(start_col, maxc + 1)}
+    ws.move_range(f"{L(start_col)}1:{L(maxc)}{max_row}", cols=by)
+    for m in merges:
+        ws.merge_cells(start_row=m.min_row, start_column=m.min_col + by, end_row=m.max_row, end_column=m.max_col + by)
+    for c, w in widths.items():
+        ws.column_dimensions[L(c + by)].width = w
 
 
 def num(v):
@@ -113,14 +186,35 @@ def main():
     ap.add_argument('--export', nargs='+', required=True)
     ap.add_argument('--out', required=True)
     ap.add_argument('--num', type=int, default=4, help="numéro d'export (colonne Source)")
+    ap.add_argument('--announced', type=int, default=0, help='total annoncé par SIGAPS si le(s) fichier(s) donné(s) n\'en contien(nen)t pas')
+    ap.add_argument('--nlm', nargs='*', default=[], help='exports du catalogue NLM (.txt) : liens, titre complet, langue, pays, MeSH')
     ap.add_argument('--date', default='', help='date de l\'export (jj/mm/aaaa)')
     a = ap.parse_args()
 
     exports = [parse_export(p) for p in a.export]
-    years_exp = exports[0]['years']
+    known = [e['years'] for e in exports if e['years']]
+    if known:
+        years_exp = known[0]
+    else:  # suite d'export sans en-tête : années déduites de la longueur des lignes + classeur
+        import collections as _c
+        n = _c.Counter(len(p) for e in exports for p in e['data']).most_common(1)[0][0]
+        years_exp = None
+        _wb = openpyxl.load_workbook(a.xlsx, read_only=True)
+        _ws = _wb['Revues']
+        _hdr = [c.value for c in next(_ws.iter_rows(min_row=1, max_row=1))]
+        _yrs = [int(v) for v in _hdr[18:] if v not in (None, '') and re.fullmatch(r'\d{4}', str(v))]
+        _wb.close()
+        if len(_yrs) * 2 + 8 == n:
+            years_exp = _yrs
+        else:
+            years_exp = list(range(_yrs[-1] - (n - 8) // 2 + 1, _yrs[-1] + 1)) if _yrs else None
+        if not years_exp:
+            raise SystemExit("Export sans en-tête : impossible de déterminer les années.")
+        print(f"Export sans en-tête : années déduites du classeur et des lignes : {years_exp}")
     for e in exports:
-        if e['years'] != years_exp:
+        if e['years'] and e['years'] != years_exp:
             raise SystemExit('Les exports n’ont pas les mêmes années : ' + ', '.join(map(str, e['years'])))
+        finalize_export(e, years_exp)
     codes = {}
     for e in exports:
         codes.update(e['codes'])
@@ -129,7 +223,7 @@ def main():
         for p in e['rows']:
             sig[p[0]] = p
     n_read = len(sig)
-    announced = sum(e['announced'] or 0 for e in exports)
+    announced = a.announced or sum(e['announced'] or 0 for e in exports)
 
     wb = openpyxl.load_workbook(a.xlsx)
     ws = wb['Revues']
@@ -142,12 +236,16 @@ def main():
     # --- années présentes dans le classeur
     sheet_years = []
     c = 19
-    while ws.cell(h1, c).value not in (None, ''):
+    while re.fullmatch(r'\d{4}', str(ws.cell(h1, c).value or '').strip()):
         sheet_years.append(int(ws.cell(h1, c).value))
         c += 2
+    extra_start = c if ws.cell(h1, c).value not in (None, '') else None  # colonnes supplémentaires à droite des années
     added_years = [y for y in years_exp if y not in sheet_years]
     if added_years and sheet_years and added_years[0] != sheet_years[-1] + 1:
         raise SystemExit(f'Année(s) {added_years} non contiguë(s) avec {sheet_years[-1]}.')
+    if added_years and extra_start:
+        shift_block(ws, extra_start, 2 * len(added_years), last)
+        extra_start += 2 * len(added_years)
     for y in added_years:  # ajout des colonnes à la suite
         c0 = 19 + 2 * len(sheet_years)
         for dr in (h1, h1 + 1):
@@ -289,6 +387,8 @@ def main():
     # --- domaines recalculés + remarques automatiques
     dom_changed = 0
     rows_all = list(range(first, last_row + 1))
+    n_have = sum(1 for r in rows_all if str(ws.cell(r, 16).value or '').startswith('SIGAPS'))
+    incomplete = bool(announced) and n_have < announced
     for r in rows_all:
         dc = str(ws.cell(r, 7).value or '')
         if dc:
@@ -334,6 +434,59 @@ def main():
             ws.cell(r, 18).value = (rm + ' ' if rm else '') + note
             tc += 1
     stats['remarques « changement de titre » ajoutées'] = tc
+
+    # --- catalogue NLM : liens, titre complet, langue, pays, MeSH
+    nlm_stats = collections.Counter()
+    mism = []
+    if a.nlm:
+        byn = {}
+        for f in a.nlm:
+            for rec in parse_nlm(f):
+                k = nlm_id(rec)
+                if k and (k not in byn or len(rec) > len(byn[k])):
+                    byn[k] = rec
+        endcol = 18 + 2 * ncol_years
+        cols = {str(ws.cell(h1, c).value): c for c in range(endcol + 1, ws.max_column + 1) if ws.cell(h1, c).value}
+        nxt = max([endcol] + list(cols.values()))
+        widths = {'title': 34, 'lang': 16, 'country': 18, 'mesh': 40}
+        for label, key in NLM_COLS:
+            if label not in cols:
+                nxt += 1
+                cols[label] = nxt
+                ws.cell(h1, nxt, label)
+                copy_style(ws.cell(h1, 18), ws.cell(h1, nxt))
+                copy_style(ws.cell(h1 + 1, 18), ws.cell(h1 + 1, nxt))
+                ws.merge_cells(start_row=h1, start_column=nxt, end_row=h1 + 1, end_column=nxt)
+                ws.column_dimensions[L(nxt)].width = widths[key]
+        for r in rows_all:
+            rec = byn.get(str(ws.cell(r, 1).value or '').strip().rstrip('R'))
+            if not rec:
+                continue
+            nlm_stats['notices NLM rattachées'] += 1
+            v = nlm_values(rec)
+            for label, key in NLM_COLS:
+                if v[key]:
+                    cell = ws.cell(r, cols[label])
+                    cell.value = v[key]
+                    copy_style(ws.cell(r, 18), cell)
+            link = best_link(rec.get('Electronic Links'))
+            if link and not ws.cell(r, 11).value:
+                ws.cell(r, 11).value = link
+                ws.cell(r, 11).hyperlink = link
+                ws.cell(r, 11).font = copy.copy(ws.cell(r, 1).font)
+                nlm_stats['liens ajoutés'] += 1
+            src = str(ws.cell(r, 17).value or '')
+            if 'NLM Catalog' not in src:
+                ws.cell(r, 17).value = (src + ' ; ' if src else '') + 'NLM Catalog'
+            st = ws.cell(r, 4).value
+            ns = 'CI' if rec.get('Current Indexing Status', '').startswith('Currently') else 'NCI'
+            if st in ('CI', 'NCI') and st != ns:
+                mism.append((ws.cell(r, 5).value, st, ns))
+                note = f"Statut MEDLINE : SIGAPS = {st}, NLM Catalog = {ns} (à vérifier)."
+                rm = str(ws.cell(r, 18).value or '')
+                if 'NLM Catalog =' not in rm:
+                    ws.cell(r, 18).value = (rm + ' ' if rm else '') + note
+        nlm_stats['notices NLM lues (distinctes)'] = len(byn)
 
     # --- mise en forme / plages
     ws.auto_filter.ref = f"A{h1 + 1}:R{last_row}"
@@ -413,37 +566,67 @@ def main():
     for c in (1, 2):
         copy_style(so.cell(2, c), so.cell(rr, c))
     so.cell(rr, 1, f"Export SIGAPS santarm n°{a.num} – {len(codes)} disciplines WoS ({', '.join(Path(e['path']).name for e in exports)})")
-    so.cell(rr, 2, f"Données SIGAPS (IF, catégories, disciplines, statut MEDLINE). {n_read} revues lues sur {announced} annoncées."
-            + (" EXPORT INCOMPLET : fichier tronqué, à refaire." if n_read < announced else ''))
+    so.cell(rr, 2, f"Données SIGAPS (IF, catégories, disciplines, statut MEDLINE). {n_read} revues lues dans ce(s) fichier(s) ; {n_have} revues SIGAPS dans le classeur pour {announced} annoncées."
+            + (" EXPORT INCOMPLET : fichier tronqué, à refaire." if incomplete else ''))
+    if not incomplete:
+        for r in range(2, so.max_row + 1):
+            v = str(so.cell(r, 2).value or '')
+            if 'EXPORT INCOMPLET : fichier tronqué, à refaire.' in v:
+                so.cell(r, 2).value = v.replace('EXPORT INCOMPLET : fichier tronqué, à refaire.', f"Fichier tronqué, complété par l'export n°{a.num}.")
     lm = wb['Lisez-moi']
     for r in range(1, lm.max_row + 1):
         k = str(lm.cell(r, 1).value or '')
         if k == 'Version':
-            lm.cell(r, 2).value = (f"v7 – {a.date or 'mise à jour'} – v6 + export SIGAPS n°{a.num} ({len(codes)} disciplines WoS) : "
-                                   f"{stats['nouvelles revues']} revues ajoutées")
+            mv = re.match(r'v(\d+)', str(lm.cell(r, 2).value or ''))
+            prev = int(mv.group(1)) if mv else 6
+            lm.cell(r, 2).value = (f"v{prev + 1} – {a.date or 'mise à jour'} – v{prev} + export SIGAPS n°{a.num} ({len(codes)} disciplines WoS) : "
+                                   f"{stats['nouvelles revues']} revues ajoutées"
+                                   + (f" ; catalogue NLM : {nlm_stats['notices NLM rattachées']} revues enrichies, {nlm_stats['liens ajoutés']} liens ajoutés" if a.nlm else '')
+                                   + ('' if incomplete else f" ; SIGAPS complet ({n_have} revues)"))
         elif k == 'Exports intégrés':
-            lm.cell(r, 2).value = str(lm.cell(r, 2).value or '') + (f" ; n°{a.num} : {len(codes)} disciplines WoS ({n_read} revues lues sur {announced} annoncées"
-                                                                    + (", export tronqué : revues manquantes" if n_read < announced else '') + ").")
+            t = str(lm.cell(r, 2).value or '')
+            if not incomplete:
+                t = t.replace(', export tronqué : revues manquantes', f", complété par l'export n°{a.num}")
+            lm.cell(r, 2).value = t + (f" ; n°{a.num} : {len(codes)} disciplines WoS ({n_read} revues lues ; {n_have} revues SIGAPS au total pour {announced} annoncées"
+                                       + (", export tronqué : revues manquantes" if incomplete else '') + ").")
         elif k == 'Exhaustivité':
-            lm.cell(r, 2).value = str(lm.cell(r, 2).value or '') + (f" Export n°{a.num} : {n_read} lignes lues pour {announced} annoncées"
-                                                                    + (" → INCOMPLET." if n_read < announced else " : complet."))
+            t = str(lm.cell(r, 2).value or '')
+            if not incomplete:
+                t = t.replace(' → INCOMPLET.', f" → complété par l'export n°{a.num}.")
+            lm.cell(r, 2).value = t + (f" Export n°{a.num} : {n_read} lignes lues ; {n_have} revues SIGAPS dans le classeur pour {announced} annoncées"
+                                       + (" → INCOMPLET." if incomplete else " : complet."))
     cv = wb['Couverture_demande']
     for r in range(2, cv.max_row + 1):
         if 'NE non sélectionnée' in str(cv.cell(r, 4).value or ''):
-            cv.cell(r, 4).value = str(cv.cell(r, 4).value) + f" [v7 : NE sélectionnée dans l'export n°{a.num}.]"
+            cv.cell(r, 4).value = str(cv.cell(r, 4).value) + f" [NE sélectionnée dans l'export n°{a.num}.]"
+
+    if a.nlm:
+        rr = so.max_row + 1
+        for c in (1, 2):
+            copy_style(so.cell(rr - 1, c), so.cell(rr, c))
+        so.cell(rr, 1, 'Catalogue NLM (' + ', '.join(Path(f).name for f in a.nlm) + ')')
+        so.cell(rr, 2, "Liens vers les revues (colonne Lien, jamais écrasés s'ils existent), titre complet, langue, pays, MeSH. "
+                       f"{nlm_stats['notices NLM rattachées']} revues rattachées par NLMid.")
+        for r in range(1, lm.max_row + 1):
+            if str(lm.cell(r, 1).value or '') == 'Colonnes ajoutées':
+                lm.cell(r, 2).value = str(lm.cell(r, 2).value or '') + " Colonnes « Titre complet (NLM) », « Langue », « Pays de publication », « MeSH (NLM) » et liens issus du catalogue NLM (à droite des années)."
 
     wb.save(a.out)
 
     # --- bilan
-    print(f"Export(s) : {n_read} revues lues sur {announced} annoncées ({sum(e['broken'] for e in exports)} ligne(s) incomplète(s) ignorée(s))")
+    print(f"Export(s) : {n_read} revues lues ({sum(e['broken'] for e in exports)} ligne(s) incomplète(s) ignorée(s)) ; revues SIGAPS dans le classeur : {n_have} pour {announced} annoncées")
     for k, v in stats.items():
         print(f'  {k} : {v}')
     print(f'  domaines recalculés : {dom_changed}')
+    for k, v in nlm_stats.items():
+        print(f'  NLM : {k} : {v}')
+    if mism:
+        print(f'  NLM : {len(mism)} statut(s) MEDLINE différent(s) de SIGAPS : ' + '; '.join(f'{t} (SIGAPS {a_}, NLM {b_})' for t, a_, b_ in mism))
     if added_years:
         print(f'  nouvelle(s) année(s) : {added_years}')
     print(f"Classeur : {last_row - first + 1} revues -> {a.out}")
-    if n_read < announced:
-        print(f"ATTENTION : export incomplet ({announced - n_read} revues manquantes). Refaire l'export en plusieurs fichiers puis relancer avec tous les fichiers.")
+    if incomplete:
+        print(f"ATTENTION : export incomplet ({announced - n_have} revues manquantes). Refaire l'export en plusieurs fichiers puis relancer avec tous les fichiers.")
 
 
 if __name__ == '__main__':
