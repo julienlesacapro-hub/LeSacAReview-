@@ -342,7 +342,13 @@ export function buildIndex(data, lexicon = []) {
       tokenize(lab).forEach((t) => put(D, t, i));
       tokenize(en.get(k) || '').forEach((t) => put(D, t, i));
     });
-    [j.i, j.is, j.es, ...Object.values(j.x || {})].forEach((v) => tokenize(v).forEach((t) => put(O, t, i)));
+    [j.i, j.is, j.es].forEach((v) => tokenize(v).forEach((t) => put(O, t, i)));
+    for (const [label, v] of Object.entries(j.x || {})) {
+      const l = norm(label);
+      // titre complet -> recherche « Titre » ; MeSH -> recherche « Domaine » ; autres colonnes ajoutées -> « Tout »
+      const map = l.startsWith('titre complet') ? T : l.startsWith('mesh') ? D : O;
+      tokenize(v).forEach((t) => put(map, t, i));
+    }
   });
   return { T, D, O, byLabel, lexicon: lexicon.map((e) => ({ a: e.a.map(norm), d: (e.d || []).map(norm), t: (e.t || []).map(norm) })), n: data.journals.length };
 }

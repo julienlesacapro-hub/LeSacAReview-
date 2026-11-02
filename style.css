@@ -264,3 +264,4 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 .ok-msg { color: var(--free-fg); font-weight: 600; }
 
 .foot { text-align: center; color: var(--muted); font-size: .8rem; padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); }
+.full { margin: 2px 0 0; font-size: .88rem; color: var(--text); opacity: .75; font-style: italic; word-break: break-word; }
