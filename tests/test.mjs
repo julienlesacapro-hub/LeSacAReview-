@@ -1,3 +1,4 @@
+// © 2026 LESACA Julien – Tous droits réservés.
 // Test de bout en bout du cœur : lecture du classeur -> chiffrement -> déchiffrement -> recherche.
 // Usage : node tests/test.mjs chemin/vers/classeur.xlsx
 import { createRequire } from 'node:module';

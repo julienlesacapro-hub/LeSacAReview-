@@ -1,3 +1,4 @@
+// © 2026 LESACA Julien – Tous droits réservés.
 // Lexique FR <-> EN : relie un mot courant (organe, maladie, discipline…) aux domaines du classeur
 // et à des racines de titres de revues (les titres sont des abréviations NLM : « Laryngoscope », « J Laryngol Otol »…).
 //

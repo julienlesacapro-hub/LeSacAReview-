@@ -1,6 +1,7 @@
+// © 2026 LESACA Julien – Tous droits réservés.
 // Service worker : l'appli reste utilisable hors ligne (dernier état connu), mais se met à jour dès qu'il y a du réseau.
-const CACHE = 'lsr-v2';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'core.js', 'lexique.js', 'config.js', 'vendor/supabase.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+const CACHE = 'lsr-v3';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'core.js', 'lexique.js', 'config.js', 'vendor/supabase.js', 'manifest.webmanifest', 'icons/favicon-32.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));

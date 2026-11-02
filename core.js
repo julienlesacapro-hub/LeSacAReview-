@@ -1,3 +1,4 @@
+// © 2026 LESACA Julien – Tous droits réservés.
 // Cœur de l'application : lecture du classeur Excel, chiffrement, recherche.
 // Aucune dépendance DOM : ce fichier est aussi exécuté sous Node par les tests.
 

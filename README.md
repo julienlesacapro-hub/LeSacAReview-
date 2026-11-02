@@ -1,4 +1,6 @@
-# Revues SIGAPS
+<p align="center"><img src="icons/logo-1024.png" alt="Logo LeSacAReview" width="160"></p>
+
+# LeSacAReview
 
 Application web (installable sur téléphone et ordinateur) pour interroger la liste des revues SIGAPS : **rang (A+ → NC) et IF**, **titre**, **soumission gratuite / payante**, **bouton vers la revue**. Résultats triés par rang puis IF.
 
@@ -71,3 +73,7 @@ Changer de code d'accès : générer `data.enc` avec le nouveau code ; chaque ap
 ## Développement
 
 `node tests/test.mjs chemin/classeur.xlsx` : lecture, chiffrement/déchiffrement et recherche sur le vrai fichier. Fichiers : `index.html`, `style.css`, `app.js`, `core.js`, `lexique.js`, `config.js` + `supabase/setup.sql` (comptes), `sw.js` (hors ligne), `vendor/` (SheetJS 0.18.5 et supabase-js 2.116.0, licences incluses).
+
+## Droits d'auteur
+
+© 2026 LESACA Julien – Tous droits réservés. Voir [`LICENSE`](LICENSE) : code, logo et documentation de LeSacAReview ; les Impact Factors (Clarivate / SIGAPS) et les bibliothèques de `vendor/` restent soumis à leurs propres conditions.
