@@ -1,3 +1,4 @@
+// © 2026 LESACA Julien – Tous droits réservés.
 // Configuration des comptes utilisateurs (Supabase). Voir README, section « Comptes utilisateurs ».
 // Ces deux valeurs sont PUBLIQUES par conception (la protection repose sur les règles de supabase/setup.sql).
 // Ne JAMAIS y mettre la clé « service_role ».

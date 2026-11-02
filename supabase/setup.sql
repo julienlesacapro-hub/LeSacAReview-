@@ -1,3 +1,4 @@
+-- © 2026 LESACA Julien – Tous droits réservés.
 -- À exécuter UNE FOIS dans Supabase : SQL Editor → New query → coller → Run.
 -- Met en place : bucket privé des données, droits de lecture/écriture, et changement
 -- obligatoire du mot de passe initial (contrôlé côté serveur, pas seulement dans l'appli).

@@ -1,3 +1,4 @@
+/* © 2026 LESACA Julien – Tous droits réservés. */
 :root {
   color-scheme: light dark;
   --bg: #f4f6f8;
@@ -52,7 +53,7 @@ h1, h2, h3 { margin: 0; line-height: 1.2; }
   padding: calc(10px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
 }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.logo { width: 36px; height: 36px; border-radius: 9px; }
+.logo { width: 40px; height: 40px; border-radius: 10px; }
 .brand h1 { font-size: 1.15rem; letter-spacing: .01em; }
 .meta { margin: 2px 0 0; font-size: .78rem; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62vw; }
 .top-actions { display: flex; gap: 6px; }
@@ -227,7 +228,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 }
 
 /* ----- Écrans d'accueil ----- */
-.gate { min-height: calc(100dvh - 70px); display: grid; place-items: center; padding: 20px; }
+.gate { min-height: calc(100dvh - 150px); display: grid; place-items: center; padding: 20px; }
 .panel {
   background: var(--surface); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow);
   padding: 28px; width: min(440px, 100%); display: grid; gap: 14px; text-align: center; justify-items: center;
@@ -261,3 +262,5 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 .linkbtn { background: none; border: 0; color: var(--accent); cursor: pointer; font-weight: 600; padding: 6px; }
 .panel.auth .error, .panel.auth .ok-msg { margin: 0; }
 .ok-msg { color: var(--free-fg); font-weight: 600; }
+
+.foot { text-align: center; color: var(--muted); font-size: .8rem; padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); }

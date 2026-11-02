@@ -1,3 +1,4 @@
+// © 2026 LESACA Julien – Tous droits réservés.
 import { RANKS, norm, deriveKey, encryptDataset, decryptDataset, packDataset, unpackDataset, parseWorkbook, buildIndex, searchIndices, refOf, compareRef, classifySub, classifyCase } from './core.js';
 import { LEXIQUE } from './lexique.js';
 import { CONFIG } from './config.js';

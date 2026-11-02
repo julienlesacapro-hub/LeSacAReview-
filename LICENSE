@@ -1,0 +1,14 @@
+© 2026 LESACA Julien. Tous droits réservés.
+
+Le code source de l'application LeSacAReview, son logo (sac, document, microscope et loupe) et sa
+documentation sont la propriété exclusive de LESACA Julien. Aucune licence n'est accordée : toute
+reproduction, modification, diffusion ou réutilisation, totale ou partielle, sans autorisation écrite
+préalable de l'auteur est interdite. La consultation de ce dépôt public ne vaut pas licence.
+
+Ne sont pas couverts par cette mention :
+- les Impact Factors et catégories issus de SIGAPS / Clarivate Analytics, qui restent soumis à leurs
+  propres conditions d'usage (ne pas diffuser) ;
+- les bibliothèques tierces du dossier vendor/, conservées sous leur licence d'origine
+  (vendor/xlsx.LICENSE : SheetJS, Apache-2.0 ; vendor/supabase.LICENSE : supabase-js, MIT).
+
+Copyright © 2026 LESACA Julien. All rights reserved. No licence is granted; see above.
