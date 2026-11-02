@@ -72,7 +72,22 @@ Changer de code d'accès : générer `data.enc` avec le nouveau code ; chaque ap
 
 ## Développement
 
-`node tests/test.mjs chemin/classeur.xlsx` : lecture, chiffrement/déchiffrement et recherche sur le vrai fichier. Fichiers : `index.html`, `style.css`, `app.js`, `core.js`, `lexique.js`, `config.js` + `supabase/setup.sql` (comptes), `sw.js` (hors ligne), `vendor/` (SheetJS 0.18.5 et supabase-js 2.116.0, licences incluses).
+`node tests/test.mjs chemin/classeur.xlsx` : lecture, chiffrement/déchiffrement et recherche sur le vrai fichier. Fichiers : `index.html`, `style.css`, `app.js`, `core.js`, `lexique.js`, `config.js` + `supabase/setup.sql` (comptes), `tools/` (fusion d'un export SIGAPS dans le classeur), `sw.js` (hors ligne), `vendor/` (SheetJS 0.18.5 et supabase-js 2.116.0, licences incluses).
+
+## Mettre à jour le classeur Excel à partir d'un export SIGAPS
+
+À faire quand SIGAPS publie de nouvelles données (nouvelle année, nouvelles revues) ou pour élargir la liste.
+
+1. **Exporter depuis SIGAPS** (`santarm.sigaps…`) au format `.txt`. Vérifier que le fichier est **complet** : la ligne « Nombre de résultat(s) » annonce le total, et le fichier doit contenir autant de lignes de revues (le script le contrôle). Au-delà d'environ 700 Ko le fichier peut être tronqué : exporter alors en **plusieurs fichiers** (par groupes de disciplines).
+2. **Fusionner** (Python 3 et `pip install openpyxl`), depuis la racine du dépôt :
+   ```
+   python3 tools/fusion_sigaps.py --xlsx Revues_ancien.xlsx --export export1.txt export2.txt --out Revues_nouveau.xlsx --num 5 --date jj/mm/aaaa
+   ```
+   Le script met à jour les valeurs SIGAPS des revues déjà présentes (sans toucher à vos colonnes lien / soumission / APC / remarques…), rattache les revues « Hors export » retrouvées par leur titre, **ajoute les nouvelles revues à la fin**, ajoute **une nouvelle année** (colonnes IF / Cat.) si l'export en contient une, recalcule la colonne Domaine(s), étend les formules et met à jour les onglets *Codes_disciplines*, *Synthèse*, *Sources* et *Lisez-moi*. Il affiche un bilan et signale tout export incomplet.
+3. Si le script réclame le libellé français d'un nouveau code de discipline, l'ajouter dans `tools/disciplines_fr.py` (les libellés au-delà des 48 d'origine sont des traductions rédigées à la main).
+4. Ouvrir `Revues_nouveau.xlsx` dans Excel, contrôler (remarques « à vérifier », colonnes vides), puis le publier dans l'appli : ⬆ → choisir le fichier → **Générer et publier**.
+
+Ne jamais déposer le classeur sur GitHub (Impact Factors Clarivate) : les fichiers `.xlsx` sont ignorés par `.gitignore`.
 
 ## Droits d'auteur
 

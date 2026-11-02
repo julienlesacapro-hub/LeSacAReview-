@@ -12,14 +12,14 @@ const file = process.argv[2];
 const t0 = Date.now();
 const data = parseWorkbook(XLSX, readFileSync(file));
 console.log('lecture', Date.now() - t0, 'ms', data.journals.length, 'revues', data.years, data.label.slice(0, 60), data.warnings.slice(0, 3));
-assert.equal(data.journals.length, 5355);
-assert.deepEqual(data.years, [2021, 2022, 2023, 2024, 2025]);
+assert(data.journals.length > 1000);
+assert(data.years.length >= 5 && data.years[0] === 2021);
 
 const key = await deriveKey('test-passphrase');
 const enc = await encryptDataset(data, key);
 console.log('data.enc', (enc.length / 1024).toFixed(0), 'Ko');
 const back = await decryptDataset(enc, key);
-assert.equal(back.journals.length, 5355);
+assert.equal(back.journals.length, data.journals.length);
 await assert.rejects(decryptDataset(enc, await deriveKey('mauvais')), /badkey/);
 
 const idx = buildIndex(back, LEXIQUE);
